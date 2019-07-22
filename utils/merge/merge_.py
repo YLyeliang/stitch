@@ -43,6 +43,7 @@ def compute_dist_angle(matches, k1, k2, img_w):
         index += 1
     return disdic, angledic, dislst, anglelst
 
+
 def get_match_index(kjz2, disdic, angledic, anglelst):
     if len(kjz2[0]) > len(kjz2[1]):
         maxidx = 0
@@ -83,7 +84,7 @@ def concat_merge_Image(img1, img2, point1, point2,
     # img2_file.fill(255)
     shifty = p2y - p1y  # 若右侧图片的keypoints在左侧上方，对图片上面部分做裁剪，否则对图片下面部分做裁剪，空出部分填充0
     if shifty <= 0:
-        img2crop = img2[:img2h + shifty, :] # 裁剪右图，使其与左图对齐
+        img2crop = img2[:img2h + shifty, :]  # 裁剪右图，使其与左图对齐
         img2_file[0 - shifty:, :] = img2crop
     else:
         img2crop = img2[shifty:, :]
@@ -106,7 +107,7 @@ def concat_merge_Image(img1, img2, point1, point2,
                     alpha = float(imgow - j) / imgow
                 imgoverlap[i, j, :] = img1overlap[i, j, :] * alpha + img2overlap[i, j, :] * (1.0 - alpha)
 
-    else:   # 灰度图像拼接
+    else:  # 灰度图像拼接
         for i in range(imgoh):
             for j in range(imgow):
                 if img2overlap[i, j] == 0:
@@ -115,14 +116,15 @@ def concat_merge_Image(img1, img2, point1, point2,
                     alpha = float(imgow - j) / imgow
                 imgoverlap[i, j] = int(img1overlap[i, j] * alpha + img2overlap[i, j] * (1.0 - alpha))
     final = cv2.hconcat([img1ori, imgoverlap, img2ori])
-    return final,img1ori, img2ori, imgoverlap,shifty
+    return final, img1ori, img2ori, imgoverlap, shifty
+
 
 def merge_image(img1, img2,
                 matches, k1, k2,
-                img1_src=None,img2_src=None,
+                img1_src=None, img2_src=None,
                 default_overlap_ratio=0.20,
-                out_match=None,ret_image=True,
-                stitch_src=False):
+                out_match=None, ret_image=True,
+                stitch_src=False,restore_size=False):
     """
     merge two images given matches and keypoints.
     :param default_overlap_ratio: if not matches are founded,
@@ -130,19 +132,23 @@ def merge_image(img1, img2,
     use this default value to merge image.
     :param out_match:If output matched results.
     """
-    bgr=True if len(img1.shape)==3 else False
+    bgr = True if len(img1.shape) == 3 else False
     if stitch_src:
         assert img1_src is not None and img2_src is not None
-        bgr=True if len(img1_src.shape)==3 else False
+        bgr = True if len(img1_src.shape) == 3 else False
 
     img1h, img1w = img1.shape[0], img1.shape[1]
-    img1_src_h,img1_src_w=img1_src.shape[0],img1_src.shape[1]
+    img1_src_h, img1_src_w = img1_src.shape[0], img1_src.shape[1]
+    img2_src_h, img2_src_w = img2_src.shape[0], img2_src.shape[1]
     img2h, img2w = img2.shape[0], img2.shape[1]
-    if not img1_src_h == img1h or not img1_src_w ==img1w:
-        img1_src=cv2.resize(img1_src,(img1w,img1h))
-        img2_src=cv2.resize(img2_src,(img2w,img2h))
+    resize=img1h/img1_src_h
+    img1_resize = img1_src.copy()
+    img2_resize=img2_src.copy()
+    if not img1_src_h == img1h or not img1_src_w == img1w:
+        img1_resize = cv2.resize(img1_src, (img1w, img1h))
+        img2_resize = cv2.resize(img2_src, (img2w, img2h))
 
-    draw_match=[]
+    draw_match = []
     if len(matches) > 3:
         flag = 0
         # filter matches
@@ -150,7 +156,7 @@ def merge_image(img1, img2,
         disdic, angledic, dislst, anglelst = compute_dist_angle(matches, k1, k2, img1w)
         disarr = np.array(dislst)
         kjz2 = cluster(disarr)  # 对距离做一个二分类（均值作为条件）
-        indexlst = get_match_index(kjz2, disdic, angledic, anglelst) # 对角度做分类找到最合适的match索引
+        indexlst = get_match_index(kjz2, disdic, angledic, anglelst)  # 对角度做分类找到最合适的match索引
         # for matchinfo in matches:
         nums = len(indexlst)
         index_mid = 0 if nums < 3 else int(nums / 2)
@@ -161,12 +167,19 @@ def merge_image(img1, img2,
             if flag == index_mid:
                 match_points = (pt1, pt2)
                 draw_match.append(matchinfo)
-                if stitch_src:
-                    dst, img1ori, img2ori, imgoverlap, shifty = concat_merge_Image(img1_src, img2_src, match_points[0],
+                if stitch_src and not restore_size:
+                    dst, img1ori, img2ori, imgoverlap, shifty = concat_merge_Image(img1_resize, img2_resize, match_points[0],
                                                                                    match_points[1], bgr=bgr)
+                elif restore_size:
+                    pt1=(pt1[0]/resize,pt1[1]/resize)
+                    pt2=(pt2[0]/resize,pt2[1]/resize)
+                    match_points = (pt1, pt2)
+                    dst, img1ori, img2ori, imgoverlap, shifty = concat_merge_Image(img1_src, img2_src, match_points[0],
+                                                                               match_points[1],
+                                                                               bgr=bgr)
                 else:
-                    dst, img1ori, img2ori, imgoverlap,shifty = concat_merge_Image(img1, img2, match_points[0],
-                                                                              match_points[1],bgr=bgr)
+                    dst, img1ori, img2ori, imgoverlap, shifty = concat_merge_Image(img1, img2, match_points[0],
+                                                                                   match_points[1], bgr=bgr)
                 print("match")
                 break
             flag += 1
@@ -177,31 +190,47 @@ def merge_image(img1, img2,
         pt2 = k2[matchinfo[0].trainIdx].pt
         match_points = (pt1, pt2)
         draw_match.append(matchinfo)
-        if stitch_src:
-            dst, img1ori, img2ori, imgoverlap, shifty = concat_merge_Image(img1_src, img2_src, match_points[0], match_points[1],
+        if stitch_src and not restore_size:
+            dst, img1ori, img2ori, imgoverlap, shifty = concat_merge_Image(img1_resize, img2_resize, match_points[0],
+                                                                           match_points[1],
+                                                                           bgr=bgr)
+        elif restore_size:
+            pt1 = (pt1[0] / resize, pt1[1] / resize)
+            pt2 = (pt2[0] / resize, pt2[1] / resize)
+            match_points=(pt1,pt2)
+            dst, img1ori, img2ori, imgoverlap, shifty = concat_merge_Image(img1_src, img2_src, match_points[0],
+                                                                           match_points[1],
                                                                            bgr=bgr)
         else:
-            dst,img1ori,img2ori,imgoverlap,shifty = concat_merge_Image(img1, img2, match_points[0], match_points[1],bgr=bgr)
+            dst, img1ori, img2ori, imgoverlap, shifty = concat_merge_Image(img1, img2, match_points[0], match_points[1],
+                                                                           bgr=bgr)
         print("match")
     else:
-        if stitch_src:
+        if stitch_src and not restore_size:
             img1ori = img1_src[:, :img1w - int(img1w * default_overlap_ratio)]
             img2ori = img2_src[:, int(img2w * default_overlap_ratio):]
             imgoverlap = img2_src[:, :int(img2w * default_overlap_ratio)] * 0.5 + img1_src[:, img1w - int(
                 img1w * default_overlap_ratio):] * 0.5
             imgoverlap = np.array(imgoverlap, dtype=np.uint8)
+        elif stitch_src and restore_size:
+            img1ori = img1_src[:, :img1_src_w - int(img1_src_w * default_overlap_ratio)]
+            img2ori = img2_src[:, int(img2_src_w * default_overlap_ratio):]
+            imgoverlap = img2_src[:, :int(img2_src_w * default_overlap_ratio)] * 0.5 + img1_src[:, img1_src_w - int(
+                img1_src_w * default_overlap_ratio):] * 0.5
+            imgoverlap = np.array(imgoverlap, dtype=np.uint8)
         else:
-            img1ori=img1[:,:img1w-int(img1w*default_overlap_ratio)]
-            img2ori=img2[:,int(img2w*default_overlap_ratio):]
-            imgoverlap=img2[:,:int(img2w*default_overlap_ratio)] * 0.5 +img1[:,img1w-int(img1w*default_overlap_ratio):]*0.5
-            imgoverlap=np.array(imgoverlap,dtype=np.uint8)
-        shifty=0
-        dst = cv2.hconcat([img1ori,imgoverlap,img2ori])
+            img1ori = img1[:, :img1w - int(img1w * default_overlap_ratio)]
+            img2ori = img2[:, int(img2w * default_overlap_ratio):]
+            imgoverlap = img2[:, :int(img2w * default_overlap_ratio)] * 0.5 + img1[:, img1w - int(
+                img1w * default_overlap_ratio):] * 0.5
+            imgoverlap = np.array(imgoverlap, dtype=np.uint8)
+        shifty = 0
+        dst = cv2.hconcat([img1ori, imgoverlap, img2ori])
         print("not match")
 
     # draw best match
     if out_match is not None:
-        img_out = cv2.drawMatchesKnn(img1, k1, img2, k2,draw_match, None, flags=2)
+        img_out = cv2.drawMatchesKnn(img1, k1, img2, k2, draw_match, None, flags=2)
         if img_out is not None:
             respath = out_match
             cv2.imwrite(respath, img_out)
@@ -210,7 +239,6 @@ def merge_image(img1, img2,
     stitch_img = np.uint8(stitchall)
 
     if ret_image:
-        return stitch_img,img1ori,img2ori,imgoverlap,shifty
+        return stitch_img, img1ori, img2ori, imgoverlap, shifty
     else:
-        return img1ori,img2ori,imgoverlap,shifty
-
+        return img1ori, img2ori, imgoverlap, shifty
