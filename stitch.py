@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import os
-from mtcv import bgr2gray, histEqualize, shift_bboxes_to_stitch, draw_bboxes, reshape_bboxes
+from mtcv import bgr2gray, histEqualize,draw_bboxes,nms
 from mtcv import bbox_to_patch,imgs_to_patches,concat_bbox
 from mtcv import read_txt_mklist
 from utils.merge import merge_image
@@ -21,7 +21,7 @@ class Stitcher(object):
     def __init__(self, resize=0.5,
                  is_norm=True,
                  is_2gray=True,
-                 descriptor_type='sift',
+                 descriptor_type='surf',
                  match_type='knn',
                  show=True):
         self.resize = resize
@@ -86,8 +86,6 @@ class Stitcher(object):
         rgb=np.stack((b,g,r))
 
 
-
-
     def det_features(self, img1, img2,
                      img1_compute_ratio=0.3,
                      img2_comopute_ratio=0.3, out=False):
@@ -125,7 +123,12 @@ class Stitcher(object):
             cv2.waitKey()
         return stitch_info
 
-    def stitch(self, images, bboxes=None, stitch_src=False, out=None, restore_size=False):
+    def stitch(self, images,
+               bboxes=None,
+               stitch_src=False,
+               out=None,
+               restore_size=False,
+               save_quality=100):
         """
         Stitch a batch of images,where a batch contain 7 images.
         :param images: 7 images.
@@ -160,18 +163,22 @@ class Stitcher(object):
         # preserve middle images with only overlap region & independent region.
         shiftys = np.array(shiftys)
         imgs_stitch=imgs_to_patches(imgs_left,imgs_overlap,imgs_right,shiftys)
+        patches_width=[patch.shape[1] for patch in imgs_stitch]
+        patches_width=np.array(patches_width)
+        coordinates=[patches_width[:i+1].sum() for i in range(len(patches_width))]
 
         stitched = cv2.hconcat(imgs_stitch)
         if bboxes is not None:
             bboxes_all=bbox_to_patch(bboxes,shiftys,imgs_left,imgs_overlap,imgs_right,
                                      imgs_stitch,images_w)
             bboxes_all=concat_bbox(bboxes_all)
-            stitched = draw_bboxes(stitched, bboxes_all)
+            self.bboxes_all,inds=nms(bboxes_all)
+            self.stitched = draw_bboxes(stitched, self.bboxes_all)
 
         if out:
             # cv2.namedWindow("stitched image", cv2.WINDOW_NORMAL)
             # cv2.imshow("stitched image", stitched)
-            cv2.imwrite(out, stitched)
+            cv2.imwrite(out, self.stitched,[int(cv2.IMWRITE_JPEG_QUALITY),save_quality])
             # cv2.waitKey()
 
 
@@ -196,11 +203,9 @@ class stitch_image(object):
 def stitch_batch(stitcher, images, bboxes=None, out=None):
     stitcher.stitch(images, bboxes, out=out, stitch_src=True, restore_size=True)
 
-
 def stitch_batches(stitcher, batches, bboxes=None, out_dir=None):
     for i, images in enumerate(batches):
         stitch_batch(stitcher, images, bboxes[i], out=out_dir + "src_{}.jpg".format(i))
-
 
 stitch = Stitcher(descriptor_type='surf', resize=0.3)
 # files = os.listdir('images')
