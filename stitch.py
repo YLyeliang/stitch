@@ -390,6 +390,7 @@ stitch = Stitcher(descriptor_type='surf', resize=0.3)
 bbox_path = "/data2/yeliang/data/stitch_test/bbox"
 bboxes = read_txt_mklist(bbox_path)
 
+
 # 拼接所有图片，batches用来存取所有图片，每个batch中包含7张图
 path = "/data2/yeliang/data/stitch_test"
 batches = []
