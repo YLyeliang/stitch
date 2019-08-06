@@ -7,7 +7,7 @@ def bgr2gray(img):
     return cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
 
-def histEqualize(img,mode='clahe'):
+def histEqualize(img,mode='clahe',clipLimit=20):
     """
     equalize histogram of a image.
     :param mode: if norm,perform normal hist, if clahe,perform adaptive histogram equalization.
@@ -16,7 +16,7 @@ def histEqualize(img,mode='clahe'):
     if mode =='norm':
         return cv2.equalizeHist(img)
     elif mode =='clahe':
-        clahe = cv2.createCLAHE(clipLimit=20.0, tileGridSize=(8, 8))
+        clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=(8, 8))
         return clahe.apply(img)
 
 
