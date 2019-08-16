@@ -8,16 +8,16 @@ def bbox_to_patch(bboxes,  # bboxes
                   imgs_left,  # imgori1
                   imgs_overlap,  # overlap region
                   imgs_right,  # imgori2
-                  imgs_stitch,  # a set of stitched img patches
+                  width_stitch,  # a set of stitched img patches
                   images_w):  # normal image width.
     """
     transform bbox of single image to bbox of stitching patches.
     :param bboxes: (None,5)
     :param shiftys: (shift of each images)
-    :param imgs_left:
-    :param imgs_overlap:
-    :param imgs_right:
-    :param imgs_stitch:
+    :param imgs_left:shapes of imgs_left
+    :param imgs_overlap:shapes of imgs_overlap
+    :param imgs_right:shapes of imgs_right
+    :param imgs_stitch: abs coordinates of pathces in stitched image
     :param images_w:
     :return:
     """
@@ -32,7 +32,7 @@ def bbox_to_patch(bboxes,  # bboxes
         bbox_shift = shiftys[:i].sum()  # if shift <=0,means right img above left,need move down.
         if i == 1:
             bboxes_left_img = bboxes[i - 1]  # get bboxes of img left.
-            left_w = imgs_left[0].shape[1]
+            left_w = imgs_left[0][1]
             if len(bboxes_left_img) < 1:
                 pass
             else:
@@ -57,9 +57,9 @@ def bbox_to_patch(bboxes,  # bboxes
                         bboxes_ovr.append([ovr_xmin, ovr_ymin, ovr_xmax, ovr_ymax, score])
 
         bboxes_mid_tmp = []  # used to keep bboxes in right part.
-        overlap_w = imgs_overlap[i - 1].shape[1]  # get overlap width, to compute relative coordinate of bbox.
-        overlap_w2 = imgs_overlap[i].shape[1]
-        right_w = imgs_right[i - 1].shape[1]
+        overlap_w = imgs_overlap[i - 1][1]  # get overlap width, to compute relative coordinate of bbox.
+        overlap_w2 = imgs_overlap[i][1]
+        right_w = imgs_right[i - 1][1]
         bboxes_ovr2 = []  # overlap region of right part.
         if len(bboxes_right_img) < 1:
             pass
@@ -130,17 +130,14 @@ def bbox_to_patch(bboxes,  # bboxes
         bboxes_left_ovr.append(bboxes_ovr)
         bboxes_right_ovr.append(bboxes_ovr2)
 
-    w = []
-    for i in range(len(imgs_stitch)):
-        w_tmp = imgs_stitch[i].shape[1]
-        w += [w_tmp]
+    w = width_stitch
     w = np.array(w)
     for i in range(len(bboxes_mid)):
-        bboxes_left_ovr[i] = shift_bboxes_to_stitch(bboxes_left_ovr[i], w[:2 * i + 1].sum())
-        bboxes_mid[i] = shift_bboxes_to_stitch(bboxes_mid[i], w[:2 * i + 2].sum())
-        bboxes_right_ovr[i] = shift_bboxes_to_stitch(bboxes_right_ovr[i], w[:2 * i + 3].sum())
+        bboxes_left_ovr[i] = shift_bboxes_to_stitch(bboxes_left_ovr[i], w[2 * i])
+        bboxes_mid[i] = shift_bboxes_to_stitch(bboxes_mid[i], w[2 * i + 1])
+        bboxes_right_ovr[i] = shift_bboxes_to_stitch(bboxes_right_ovr[i], w[2 * i + 2])
         if i == (len(bboxes_mid) - 1):
-            bboxes_right = shift_bboxes_to_stitch(bboxes_right, w[:-1].sum())
+            bboxes_right = shift_bboxes_to_stitch(bboxes_right, w[-2])
     bboxes_left_ovr = reshape_bboxes(bboxes_left_ovr)
     bboxes_mid = reshape_bboxes(bboxes_mid)
     bboxes_right_ovr = reshape_bboxes(bboxes_right_ovr)

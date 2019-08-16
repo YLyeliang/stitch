@@ -36,7 +36,11 @@ def compute_matches(img1,
     bf = cv2.BFMatcher()
     # Finds the k best matches for each descriptor from a query set.
     matches = bf.knnMatch(des1, des2, k=2)
-
+    if matches:
+        if len(matches[0])<2:
+            return [],des1,des2
+    else:
+        return [],des1,des2
     # Apply ratio test
     final_matches = []
     img1h = img1.shape[0]

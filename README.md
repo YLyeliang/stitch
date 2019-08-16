@@ -8,3 +8,6 @@ change corresponding parameters and just run.
 # Notes
 This is not for rotated images,since I don't operate warp transform on two matched images,
 This is only for images that can matches in horizontal direnction.
+
+# Results
+![avatar](3.jpg)
